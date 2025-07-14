@@ -3,16 +3,17 @@ Configuration file for object detection settings.
 
 This file contains configurable parameters for the object detection application.
 You can modify these settings to customize the behavior of the detector.
+Following Azure best practices for configuration management.
 """
 
 # Camera settings
 CAMERA_INDEX = 0
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
 
 # Detection thresholds
-CONFIDENCE_THRESHOLD = 0.5
-NMS_THRESHOLD = 0.4
+CONFIDENCE_THRESHOLD = 0.7
+NMS_THRESHOLD = 0.6
 
 # Model settings
 MODEL_TYPE = "yolov8"  # Options: "opencv_dnn", "yolov3", "yolov5", "yolov8", "tensorflow", "pytorch"
@@ -20,7 +21,7 @@ MODEL_TYPE = "yolov8"  # Options: "opencv_dnn", "yolov3", "yolov5", "yolov8", "t
 # YOLOv8 Ultralytics settings
 YOLO_MODEL = "yolov8n.pt"  # Options: yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt
 YOLO_DEVICE = "cpu"  # Options: "cpu", "cuda", "mps" (for Mac M1/M2)
-YOLO_IMGSZ = 640  # Input image size for YOLO model
+YOLO_IMGSZ = 1280  # Input image size for YOLO model
 YOLO_HALF = False  # Use half precision (FP16) for faster inference
 YOLO_VERBOSE = False  # Show detailed model loading info
 
@@ -64,3 +65,20 @@ RESIZE_FACTOR = 1.0  # Resize input frames (1.0 = no resize, 0.5 = half size)
 ENABLE_TRACKING = False  # Enable object tracking between frames
 MAX_TRACKING_DISTANCE = 50  # Maximum distance for object tracking
 MIN_DETECTION_SIZE = 30  # Minimum size of detections to display
+
+# Object tracking configuration (following Azure best practices)
+TRACKING_ENABLED = True
+IMPORTANT_OBJECTS = [
+    "person", "car", "bicycle", "motorcycle", "bus", "truck", "backpack",
+    "handbag", "suitcase", "laptop", "cell phone", "book", "bottle", 
+    "cup", "knife", "spoon", "bowl", "chair", "dining table", "couch",
+    "tv", "remote", "keyboard", "mouse", "scissors", "teddy bear",
+    "hair drier", "toothbrush"
+]
+TRACKING_MEMORY_DURATION = 300  # seconds to remember object locations
+TRACKING_MIN_CONFIDENCE = 0.8  # minimum confidence to track an object
+TRACKING_DISTANCE_THRESHOLD = 100  # pixels - objects closer than this are considered same instance
+TRACKING_MAX_OBJECTS = 1000  # maximum number of objects to track simultaneously
+SHOW_LAST_SEEN_INFO = True  # show tracking information on screen
+TRACKING_HISTORY_FILE = "object_tracking_history.json"  # file to save tracking history
+TRACKING_ENABLE_LOGGING = True  # enable structured logging for tracking

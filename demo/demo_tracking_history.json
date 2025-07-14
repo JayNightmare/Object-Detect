@@ -1,0 +1,28 @@
+{
+  "person_1": {
+    "class_name": "person",
+    "confidence": 0.85,
+    "center_x": 250,
+    "center_y": 250,
+    "width": 100,
+    "height": 200,
+    "first_seen": 1752519408.3703365,
+    "last_seen": 1752519408.3703365,
+    "times_detected": 1,
+    "zone": "center",
+    "object_id": "person_1"
+  },
+  "person_2": {
+    "class_name": "person",
+    "confidence": 0.8,
+    "center_x": 400,
+    "center_y": 200,
+    "width": 100,
+    "height": 200,
+    "first_seen": 1752519410.3709905,
+    "last_seen": 1752519410.3709905,
+    "times_detected": 1,
+    "zone": "center",
+    "object_id": "person_2"
+  }
+}

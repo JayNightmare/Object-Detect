@@ -1,11 +1,12 @@
-# Camera Object Detection with YOLOv8
+# Camera Object Detection with YOLOv8 + Object Tracking
 
-A real-time object detection application using Python, OpenCV, and YOLOv8 from Ultralytics that captures video from your computer's camera and detects objects in the live feed.
+A real-time object detection application using Python, OpenCV, and YOLOv8 from Ultralytics that captures video from your computer's camera and detects objects in the live feed. Now includes intelligent object tracking that remembers important objects and their locations!
 
 ![Object Detection Demo](https://img.shields.io/badge/Python-3.8%2B-blue) ![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-green) ![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-orange) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features
 
+### Core Detection Features
 - **YOLOv8 Integration**: State-of-the-art object detection with Ultralytics YOLOv8
 - **Real-time Detection**: Live object detection from camera feed with high accuracy
 - **Multiple Model Sizes**: Support for YOLOv8n, YOLOv8s, YOLOv8m, YOLOv8l, YOLOv8x
@@ -16,6 +17,15 @@ A real-time object detection application using Python, OpenCV, and YOLOv8 from U
 - **Screenshot Capture**: Save images with detected objects
 - **Configurable Settings**: Adjustable detection thresholds and parameters
 - **Cross-platform**: Works on Windows, macOS, and Linux
+
+### 🆕 Object Tracking Features
+- **Smart Object Memory**: Remembers important objects and their last seen locations
+- **Zone-based Tracking**: Divides camera view into 9 zones (3x3 grid) for location reference
+- **Persistent Storage**: Saves tracking history between application sessions
+- **Important Objects Filter**: Focuses on user-defined important object types
+- **Real-time Tracking Info**: Shows current and recently seen objects on screen
+- **Comprehensive Statistics**: Track detection counts, memory usage, and object distribution
+- **Azure Best Practices**: Follows enterprise coding standards with proper error handling and logging
 
 ## Quick Start
 
@@ -47,7 +57,8 @@ A real-time object detection application using Python, OpenCV, and YOLOv8 from U
 1. **Start the application**: Run `python main.py`
 2. **Camera will open**: You'll see a live video feed from your camera
 3. **Objects will be detected**: Detected objects will have bounding boxes and labels
-4. **Take screenshots**: Press `Space` to save a screenshot
+4. **Object tracking**: Important objects will be tracked and remembered
+5. **Take screenshots**: Press `Space` to save a screenshot
 5. **Exit**: Press `Q` to quit the application
 
 ## Configuration
@@ -67,6 +78,31 @@ CAMERA_HEIGHT = 480         # Camera resolution height
 SHOW_FPS = True            # Show FPS counter
 SHOW_CONFIDENCE = True     # Show confidence scores
 ```
+
+### 🆕 Object Tracking Configuration
+
+The tracking system can be customized in `config.py`:
+
+```python
+# Object tracking settings
+TRACKING_ENABLED = True                    # Enable/disable object tracking
+IMPORTANT_OBJECTS = [                      # Objects to track and remember
+    "person", "car", "laptop", "cell phone", "book", "bottle"
+]
+TRACKING_MEMORY_DURATION = 300            # Seconds to remember objects
+TRACKING_MIN_CONFIDENCE = 0.6             # Minimum confidence to track
+TRACKING_DISTANCE_THRESHOLD = 100         # Pixel distance for object matching
+TRACKING_MAX_OBJECTS = 1000               # Maximum objects to track
+SHOW_LAST_SEEN_INFO = True                # Show tracking overlay on video
+TRACKING_HISTORY_FILE = "object_tracking_history.json"  # History file
+```
+
+**Key Tracking Features:**
+- **Memory System**: Objects are remembered for 5 minutes by default
+- **Zone Detection**: Screen divided into 9 zones (top-left, center, etc.)
+- **Persistent Storage**: Tracking history survives app restarts
+- **Smart Filtering**: Only tracks user-defined important objects
+- **Performance Optimized**: Follows Azure enterprise coding standards
 
 ## Command Line Options
 
@@ -105,24 +141,44 @@ python main.py --camera 1 --model yolov8m.pt --confidence 0.6 --device cuda
 
 | Key | Action |
 |-----|--------|
-| `Q` | Quit application |
+| `Q` or `ESC` | Quit application |
 | `Space` | Take screenshot |
-| `ESC` | Alternative quit method |
+| `R` | Reset FPS counter |
+| `T` | Show tracking information in console |
+| `S` | Save tracking history to file |
+| `I` | Show tracking statistics |
+
+### 🆕 Object Tracking Controls
+
+The application now includes intelligent object tracking. When enabled, you'll see:
+- **Green indicators** (🟢): Objects currently visible
+- **Red indicators** (🔴): Objects that were recently seen with timestamps
+- **Zone information**: Where objects were last detected (e.g., "center", "top-left")
+
+**Example tracking display:**
+```
+🟢 person - center (now)
+🔴 laptop - bottom-left (15s ago)
+🟢 cell phone - top-right (now)
+```
 
 ## Project Structure
 
 ```
 Object Detect/
-├── main.py                 # Main application file
-├── config.py              # Configuration settings
-├── utils.py               # Utility functions
-├── requirements.txt       # Python dependencies
-├── README.md              # Project documentation
+├── main.py                      # Main application file with YOLOv8 detection
+├── object_tracker.py           # 🆕 Intelligent object tracking system
+├── tracking_demo.py            # 🆕 Demo script for tracking features
+├── config.py                   # Configuration settings (now with tracking config)
+├── utils.py                    # Utility functions
+├── requirements.txt            # Python dependencies
+├── README.md                   # Project documentation
+├── object_tracking_history.json # 🆕 Persistent tracking data (auto-generated)
 ├── .github/
 │   └── copilot-instructions.md  # Copilot development guidelines
-├── screenshots/           # Saved screenshots (created automatically)
-├── output/               # Output files (created automatically)
-└── models/               # Model files (created automatically)
+├── screenshots/                # Saved screenshots (created automatically)
+├── output/                     # Output files (created automatically)
+└── models/                     # Model files (created automatically)
 ```
 
 ## Detected Object Classes

@@ -11,8 +11,17 @@ import numpy as np
 import argparse
 import time
 import os
+import logging
 from typing import List, Tuple, Optional
 from pathlib import Path
+
+# Import object tracker
+try:
+    from object_tracker import ObjectTracker, ObjectTrackerError
+    TRACKER_AVAILABLE = True
+except ImportError:
+    TRACKER_AVAILABLE = False
+    print("Warning: object_tracker module not available. Tracking features disabled.")
 
 # Import YOLOv8 from Ultralytics
 try:
@@ -22,27 +31,42 @@ except ImportError:
     YOLO_AVAILABLE = False
     print("Warning: Ultralytics YOLO not available. Install with: pip install ultralytics")
 
-# # Import project config
-# try:
-#     # import config
-# except ImportError:
-print("Warning: config.py not found. Using default settings.")
-class config:
-    CAMERA_INDEX = 0
-    CAMERA_WIDTH = 640
-    CAMERA_HEIGHT = 480
-    CONFIDENCE_THRESHOLD = 0.5
-    NMS_THRESHOLD = 0.4
-    MODEL_TYPE = "yolov8"
-    YOLO_MODEL = "yolov8n.pt"
-    YOLO_DEVICE = "cpu"
-    YOLO_IMGSZ = 640
-    YOLO_HALF = False
-    YOLO_VERBOSE = False
-    SHOW_FPS = True
-    SHOW_CONFIDENCE = True
-    SCREENSHOT_PATH = "screenshots/"
-    SCREENSHOT_FORMAT = "jpg"
+# Import project config
+try:
+    import config
+except ImportError:
+    print("Warning: config.py not found. Using default settings.")
+    class config:
+        CAMERA_INDEX = 0
+        CAMERA_WIDTH = 640
+        CAMERA_HEIGHT = 480
+        CONFIDENCE_THRESHOLD = 0.5
+        NMS_THRESHOLD = 0.4
+        MODEL_TYPE = "yolov8"
+        YOLO_MODEL = "yolov8n.pt"
+        YOLO_DEVICE = "cpu"
+        YOLO_IMGSZ = 640
+        YOLO_HALF = False
+        YOLO_VERBOSE = False
+        SHOW_FPS = True
+        SHOW_CONFIDENCE = True
+        SCREENSHOT_PATH = "screenshots/"
+        SCREENSHOT_FORMAT = "jpg"
+        
+        # Object tracking configuration (following Azure best practices)
+        TRACKING_ENABLED = True
+        IMPORTANT_OBJECTS = [
+            "person", "car", "bicycle", "motorcycle", "bus", "truck", "backpack",
+            "handbag", "suitcase", "laptop", "cell phone", "book", "bottle", 
+            "cup", "knife", "spoon", "bowl", "chair", "dining table", "couch"
+        ]
+        TRACKING_MEMORY_DURATION = 300  # seconds to remember object locations
+        TRACKING_MIN_CONFIDENCE = 0.8  # minimum confidence to track an object
+        TRACKING_DISTANCE_THRESHOLD = 100  # pixels - objects closer than this are considered same instance
+        TRACKING_MAX_OBJECTS = 1000  # maximum number of objects to track simultaneously
+        SHOW_LAST_SEEN_INFO = True
+        TRACKING_HISTORY_FILE = "object_tracking_history.json"
+        TRACKING_ENABLE_LOGGING = True
 
 class YOLOv8Detector:
     """Real-time object detection using YOLOv8 from Ultralytics."""
@@ -233,6 +257,31 @@ class CameraApp:
             print("Please install ultralytics: pip install ultralytics")
             raise
 
+        # Initialize object tracker (following Azure best practices)
+        self.tracker = None
+        if (TRACKER_AVAILABLE and 
+            hasattr(config, 'TRACKING_ENABLED') and 
+            config.TRACKING_ENABLED):
+            try:
+                self.tracker = ObjectTracker(
+                    important_objects=config.IMPORTANT_OBJECTS,
+                    memory_duration=config.TRACKING_MEMORY_DURATION,
+                    min_confidence=config.TRACKING_MIN_CONFIDENCE,
+                    distance_threshold=config.TRACKING_DISTANCE_THRESHOLD,
+                    history_file=config.TRACKING_HISTORY_FILE,
+                    enable_logging=config.TRACKING_ENABLE_LOGGING,
+                    max_tracked_objects=config.TRACKING_MAX_OBJECTS
+                )
+                print("✅ Object tracking initialized successfully")
+            except ObjectTrackerError as e:
+                print(f"⚠️ Warning: Object tracking initialization failed: {e}")
+                print("Continuing without tracking features...")
+                self.tracker = None
+            except Exception as e:
+                print(f"⚠️ Warning: Unexpected error initializing tracker: {e}")
+                print("Continuing without tracking features...")
+                self.tracker = None
+
         # FPS calculation
         self.fps_counter = 0
         self.fps_start_time = time.time()
@@ -295,16 +344,131 @@ class CameraApp:
             print(f"❌ Error saving screenshot: {e}")
             return ""
 
+    def draw_tracking_info(self, frame: np.ndarray) -> np.ndarray:
+        """
+        Draw tracking information on the frame following Azure best practices.
+        
+        Args:
+            frame: Input frame to draw on
+            
+        Returns:
+            Frame with tracking information overlaid
+        """
+        if not self.tracker:
+            return frame
+        
+        try:
+            active_objects = self.tracker.get_active_objects()
+            y_offset = 100
+            
+            for obj_id, tracked_obj in active_objects.items():
+                current_time = time.time()
+                time_ago = self.tracker.format_time_ago(tracked_obj.last_seen)
+                
+                # Determine if object is currently visible (seen within last 2 seconds)
+                is_current = (current_time - tracked_obj.last_seen) < 2
+                
+                if is_current:
+                    status_text = f"🟢 {tracked_obj.class_name} - {tracked_obj.zone} (now)"
+                    color = (0, 255, 0)  # Green for current
+                else:
+                    status_text = f"🔴 {tracked_obj.class_name} - {tracked_obj.zone} ({time_ago})"
+                    color = (0, 100, 255)  # Orange for last seen
+                
+                cv2.putText(frame, status_text, (10, y_offset), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                y_offset += 20
+                
+                # Prevent overlay from going off-screen
+                if y_offset > frame.shape[0] - 50:
+                    break
+            
+            return frame
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to draw tracking info: {e}")
+            return frame
+    
+    def handle_tracking_commands(self, key: int) -> None:
+        """
+        Handle keyboard commands for tracking features.
+        
+        Args:
+            key: Pressed key code
+        """
+        if not self.tracker:
+            return
+            
+        try:
+            if key == ord('t'):  # Show tracking info
+                print("\n📍 Currently Tracked Objects:")
+                active_objects = self.tracker.get_active_objects()
+                
+                if not active_objects:
+                    print("No objects currently being tracked.")
+                else:
+                    for obj_id, tracked_obj in active_objects.items():
+                        time_ago = self.tracker.format_time_ago(tracked_obj.last_seen)
+                        print(f"  • {tracked_obj.class_name}: {tracked_obj.zone} ({time_ago})")
+                        print(f"    Detected {tracked_obj.times_detected} times, confidence: {tracked_obj.confidence:.2f}")
+            
+            elif key == ord('s'):  # Save tracking history
+                if self.tracker.save_history():
+                    print("💾 Tracking history saved successfully")
+                else:
+                    print("❌ Failed to save tracking history")
+            
+            elif key == ord('i'):  # Show tracking statistics
+                stats = self.tracker.get_tracking_statistics()
+                print("\n📊 Tracking Statistics:")
+                print(f"  • Total active objects: {stats['total_active_objects']}")
+                print(f"  • Total tracked objects: {stats['total_tracked_objects']}")
+                print(f"  • Memory usage: {stats['memory_usage_ratio']:.1%}")
+                print(f"  • Object counts by class: {stats['object_counts_by_class']}")
+                
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to handle tracking command: {e}")
+
+    def find_object_command(self) -> None:
+        """
+        Handle object finding functionality.
+        Note: This is a simplified version. In a production system,
+        you might want to implement this using a separate thread or GUI.
+        """
+        if not self.tracker:
+            print("⚠️ Object tracking is not available")
+            return
+        
+        try:
+            print("\nAvailable object types to search for:")
+            for obj_type in sorted(config.IMPORTANT_OBJECTS):
+                print(f"  • {obj_type}")
+            
+            print("\nPress 'f' + object initial to find (e.g., 'fp' for person, 'fl' for laptop)")
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to show find object menu: {e}")
+
     def run(self):
         """Run the main camera loop with YOLOv8 object detection."""
         if not self.initialize_camera():
             return
+
+        # Set frame dimensions for tracker
+        if self.tracker:
+            actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            self.tracker.set_frame_dimensions(actual_width, actual_height)
 
         print("\n🎥 Starting YOLOv8 object detection...")
         print("Controls:")
         print("  'q' or 'ESC' - Quit")
         print("  'space' - Take screenshot")
         print("  'r' - Reset FPS counter")
+        if self.tracker:
+            print("  't' - Show tracking info")
+            print("  's' - Save tracking history")
+            print("  'i' - Show tracking statistics")
 
         try:
             while True:
@@ -326,8 +490,19 @@ class CameraApp:
                 boxes, confidences, class_ids, class_names = self.detector.detect_objects(frame)
                 detection_time = time.time() - start_time
                 
+                # Update object tracking
+                if self.tracker:
+                    try:
+                        tracked_objects = self.tracker.update_tracking(boxes, confidences, class_ids, class_names)
+                    except Exception as e:
+                        print(f"⚠️ Warning: Tracking update failed: {e}")
+                
                 # Draw detections
                 frame = self.detector.draw_detections(frame, boxes, confidences, class_ids, class_names)
+                
+                # Draw tracking information
+                if self.tracker and hasattr(config, 'SHOW_LAST_SEEN_INFO') and config.SHOW_LAST_SEEN_INFO:
+                    frame = self.draw_tracking_info(frame)
                 
                 # Calculate and display FPS
                 fps = self.calculate_fps()
@@ -344,12 +519,15 @@ class CameraApp:
                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
                 
                 # Add instructions
-                instructions = "Controls: 'q'=quit | 'space'=screenshot | 'r'=reset FPS"
+                if self.tracker:
+                    instructions = "Controls: 'q'=quit | 'space'=screenshot | 'r'=reset FPS | 't'=tracking | 'i'=stats"
+                else:
+                    instructions = "Controls: 'q'=quit | 'space'=screenshot | 'r'=reset FPS"
                 cv2.putText(frame, instructions, (10, frame.shape[0] - 10), 
                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                 
                 # Display frame
-                cv2.imshow('YOLOv8 Object Detection', frame)
+                cv2.imshow('Object Detection w/ Yolo', frame)
                 
                 # Handle key presses
                 key = cv2.waitKey(1) & 0xFF
@@ -362,11 +540,21 @@ class CameraApp:
                     self.fps_start_time = time.time()
                     self.current_fps = 0
                     print("🔄 FPS counter reset")
+                elif self.tracker:
+                    self.handle_tracking_commands(key)
                 
         except KeyboardInterrupt:
             print("\n⚠️ Interrupted by user")
         
         finally:
+            # Save tracking history before exit
+            if self.tracker:
+                try:
+                    self.tracker.save_history()
+                    print("💾 Tracking history saved on exit")
+                except Exception as e:
+                    print(f"⚠️ Warning: Failed to save tracking history: {e}")
+            
             # Clean up
             if self.cap:
                 self.cap.release()
