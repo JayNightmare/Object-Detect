@@ -1,0 +1,134 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Install Dependencies",
+            "type": "shell",
+            "command": "pip",
+            "args": ["install", "-r", "requirements.txt"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Camera Object Detection",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run with Custom Camera",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "--camera", "1"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run with Lower Confidence",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "--confidence", "0.3"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run with YOLOv8 Small Model",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "--model", "yolov8s.pt"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run with GPU (if available)",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "--device", "cuda"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Check Available Cameras",
+            "type": "shell",
+            "command": "python",
+            "args": ["-c", "import cv2; cameras = [i for i in range(10) if cv2.VideoCapture(i).isOpened()]; print(f'Available cameras: {cameras}')"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test OpenCV Installation",
+            "type": "shell",
+            "command": "python",
+            "args": ["-c", "import cv2; print(f'OpenCV version: {cv2.__version__}')"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Test YOLOv8 Installation",
+            "type": "shell",
+            "command": "python",
+            "args": ["-c", "from ultralytics import YOLO; print('✅ YOLOv8 is installed and working!')"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

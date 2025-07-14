@@ -1,0 +1,21 @@
+# Core computer vision and ML libs
+opencv-python>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# YOLOv8 + PyTorch backend
+ultralytics>=8.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Visualization and quality of life
+tqdm>=4.65.0
+matplotlib>=3.7.0
+
+# Optional utilities
+requests>=2.31.0
+# flask>=2.3.0
+# streamlit>=1.25.0
+# onnx>=1.14.0
+# onnxruntime>=1.15.0
+# roboflow

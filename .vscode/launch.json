@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Object Detection",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": []
+        },
+        {
+            "name": "Run Object Detection (Camera 1)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--camera", "1"]
+        },
+        {
+            "name": "Run Object Detection (Low Confidence)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--confidence", "0.3"]
+        },
+        {
+            "name": "Debug Object Detection",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [],
+            "stopOnEntry": false
+        }
+    ]
+}
