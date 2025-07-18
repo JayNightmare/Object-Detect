@@ -1,1 +1,41 @@
-{}
+{
+  "person_2": {
+    "class_name": "person",
+    "confidence": 0.8631150126457214,
+    "center_x": 767,
+    "center_y": 445,
+    "width": 641,
+    "height": 543,
+    "first_seen": 1752799384.0367465,
+    "last_seen": 1752799568.4578228,
+    "times_detected": 73,
+    "zone": "center",
+    "object_id": "person_2"
+  },
+  "cell phone_4": {
+    "class_name": "cell phone",
+    "confidence": 0.8779598474502563,
+    "center_x": 729,
+    "center_y": 299,
+    "width": 131,
+    "height": 241,
+    "first_seen": 1752799513.1005282,
+    "last_seen": 1752799516.1226285,
+    "times_detected": 13,
+    "zone": "center",
+    "object_id": "cell phone_4"
+  },
+  "person_5": {
+    "class_name": "person",
+    "confidence": 0.8716773390769958,
+    "center_x": 703,
+    "center_y": 408,
+    "width": 566,
+    "height": 610,
+    "first_seen": 1752799577.8410056,
+    "last_seen": 1752799725.7410605,
+    "times_detected": 63,
+    "zone": "center",
+    "object_id": "person_5"
+  }
+}

@@ -19,7 +19,9 @@ NMS_THRESHOLD = 0.6
 MODEL_TYPE = "yolov8"  # Options: "opencv_dnn", "yolov3", "yolov5", "yolov8", "tensorflow", "pytorch"
 
 # YOLOv8 Ultralytics settings
-YOLO_MODEL = "yolov8n.pt"  # Options: yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt
+YOLO_MODEL = (
+    "yolov8n.pt"  # Options: yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt
+)
 YOLO_DEVICE = "cpu"  # Options: "cpu", "cuda", "mps" (for Mac M1/M2)
 YOLO_IMGSZ = 1280  # Input image size for YOLO model
 YOLO_HALF = False  # Use half precision (FP16) for faster inference
@@ -32,13 +34,13 @@ YOLO_CLASSES = "models/coco.names"
 
 # Colors for different object classes (BGR format)
 CLASS_COLORS = {
-    'person': (0, 255, 0),      # Green
-    'car': (255, 0, 0),         # Blue
-    'bicycle': (0, 0, 255),     # Red
-    'motorcycle': (255, 255, 0), # Cyan
-    'bus': (255, 0, 255),       # Magenta
-    'truck': (0, 255, 255),     # Yellow
-    'default': (128, 128, 128)  # Gray
+    "person": (0, 255, 0),  # Green
+    "car": (255, 0, 0),  # Blue
+    "bicycle": (0, 0, 255),  # Red
+    "motorcycle": (255, 255, 0),  # Cyan
+    "bus": (255, 0, 255),  # Magenta
+    "truck": (0, 255, 255),  # Yellow
+    "default": (128, 128, 128),  # Gray
 }
 
 # Display settings
@@ -69,15 +71,40 @@ MIN_DETECTION_SIZE = 30  # Minimum size of detections to display
 # Object tracking configuration (following Azure best practices)
 TRACKING_ENABLED = True
 IMPORTANT_OBJECTS = [
-    "person", "car", "bicycle", "motorcycle", "bus", "truck", "backpack",
-    "handbag", "suitcase", "laptop", "cell phone", "book", "bottle", 
-    "cup", "knife", "spoon", "bowl", "chair", "dining table", "couch",
-    "tv", "remote", "keyboard", "mouse", "scissors", "teddy bear",
-    "hair drier", "toothbrush"
+    "person",
+    "car",
+    "bicycle",
+    "motorcycle",
+    "bus",
+    "truck",
+    "backpack",
+    "handbag",
+    "suitcase",
+    "laptop",
+    "cell phone",
+    "book",
+    "bottle",
+    "cup",
+    "knife",
+    "spoon",
+    "bowl",
+    "chair",
+    "dining table",
+    "couch",
+    "tv",
+    "remote",
+    "keyboard",
+    "mouse",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
 ]
 TRACKING_MEMORY_DURATION = 300  # seconds to remember object locations
 TRACKING_MIN_CONFIDENCE = 0.8  # minimum confidence to track an object
-TRACKING_DISTANCE_THRESHOLD = 100  # pixels - objects closer than this are considered same instance
+TRACKING_DISTANCE_THRESHOLD = (
+    100  # pixels - objects closer than this are considered same instance
+)
 TRACKING_MAX_OBJECTS = 1000  # maximum number of objects to track simultaneously
 SHOW_LAST_SEEN_INFO = True  # show tracking information on screen
 TRACKING_HISTORY_FILE = "object_tracking_history.json"  # file to save tracking history
