@@ -69,7 +69,7 @@ def test_imports():
     packages = [
         ("cv2", "OpenCV"),
         ("numpy", "NumPy"),
-        ("ultralytics", "Ultralytics YOLOv8"),
+        ("ultralytics", "Ultralytics YOLOv11"),
         ("torch", "PyTorch"),
         ("argparse", "argparse"),
         ("time", "time"),

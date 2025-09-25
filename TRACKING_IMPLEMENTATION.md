@@ -171,7 +171,7 @@ stats = tracker.get_tracking_statistics()
 python main.py
 
 # Run with specific model and tracking
-python main.py --model yolov8s.pt --confidence 0.6
+python main.py --model yolo11s.pt --confidence 0.6
 ```
 
 #### Programmatic Usage:

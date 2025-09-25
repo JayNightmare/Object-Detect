@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Camera Object Detection Application with YOLOv8
+Camera Object Detection Application with YOLOv11
 
 This application uses your computer's camera to detect objects in real-time
-using YOLOv8 from Ultralytics.
+using YOLOv11 from Ultralytics.
 """
 
 import cv2
@@ -24,7 +24,7 @@ except ImportError:
     TRACKER_AVAILABLE = False
     print("Warning: object_tracker module not available. Tracking features disabled.")
 
-# Import YOLOv8 from Ultralytics
+# Import YOLO from Ultralytics (YOLOv11 support)
 try:
     from ultralytics import YOLO
 
@@ -47,8 +47,8 @@ except ImportError:
         CAMERA_HEIGHT = 480
         CONFIDENCE_THRESHOLD = 0.5
         NMS_THRESHOLD = 0.4
-        MODEL_TYPE = "yolov8"
-        YOLO_MODEL = "yolov8n.pt"
+        MODEL_TYPE = "yolov11"
+        YOLO_MODEL = "yolo11n.pt"
         YOLO_DEVICE = "cpu"
         YOLO_IMGSZ = 640
         YOLO_HALF = False
@@ -93,12 +93,12 @@ except ImportError:
         TRACKING_ENABLE_LOGGING = True
 
 
-class YOLOv8Detector:
-    """Real-time object detection using YOLOv8 from Ultralytics."""
+class YOLODetector:
+    """Real-time object detection using YOLOv11 from Ultralytics."""
 
     def __init__(
         self,
-        model_name: str = "yolov8n.pt",
+        model_name: str = "yolo11n.pt",
         confidence_threshold: float = 0.5,
         device: str = "cpu",
         imgsz: int = 640,
@@ -106,10 +106,10 @@ class YOLOv8Detector:
         verbose: bool = False,
     ):
         """
-        Initialize the YOLOv8 detector.
+        Initialize the YOLO detector.
 
         Args:
-            model_name: YOLOv8 model name (yolov8n.pt, yolov8s.pt, etc.)
+            model_name: YOLO model name (yolo11n.pt, yolo11s.pt, etc.)
             confidence_threshold: Minimum confidence for object detection
             device: Device to run inference on ('cpu', 'cuda', 'mps')
             imgsz: Input image size
@@ -127,8 +127,8 @@ class YOLOv8Detector:
         self.half = half
         self.verbose = verbose
 
-        # Load YOLOv8 model
-        print(f"Loading YOLOv8 model: {model_name}")
+        # Load YOLO model (v11 default)
+        print(f"Loading YOLO model: {model_name}")
         try:
             self.model = YOLO(model_name)
             if verbose:
@@ -139,13 +139,13 @@ class YOLOv8Detector:
             print(f"❌ Error loading model: {e}")
             raise
 
-        # COCO class names (YOLOv8 uses COCO dataset by default)
+        # COCO class names (YOLO models use the COCO dataset by default)
         self.class_names = self.model.names
 
         # Generate colors for each class
         self.colors = self._generate_colors(len(self.class_names))
 
-        print(f"✅ YOLOv8 detector initialized with {len(self.class_names)} classes")
+        print(f"✅ YOLO detector initialized with {len(self.class_names)} classes")
 
     def _generate_colors(self, num_classes: int) -> List[Tuple[int, int, int]]:
         """Generate random colors for different classes."""
@@ -158,7 +158,7 @@ class YOLOv8Detector:
 
     def detect_objects(self, frame: np.ndarray) -> Tuple[List, List, List, List]:
         """
-        Detect objects in the given frame using YOLOv8.
+        Detect objects in the given frame using YOLOv11.
 
         Args:
             frame: Input frame from camera
@@ -167,7 +167,7 @@ class YOLOv8Detector:
             Tuple of (boxes, confidences, class_ids, class_names)
         """
         try:
-            # Run YOLOv8 inference
+            # Run YOLO inference
             results = self.model(
                 frame,
                 imgsz=self.imgsz,
@@ -274,22 +274,22 @@ class YOLOv8Detector:
 
 
 class CameraApp:
-    """Main camera application for real-time object detection with YOLOv8."""
+    """Main camera application for real-time object detection with YOLOv11."""
 
-    def __init__(self, camera_index: int = 0, model_name: str = "yolov8n.pt"):
+    def __init__(self, camera_index: int = 0, model_name: str = "yolo11n.pt"):
         """
         Initialize the camera application.
 
         Args:
             camera_index: Index of the camera to use (0 for default)
-            model_name: YOLOv8 model to use
+            model_name: YOLO model to use
         """
         self.camera_index = camera_index
         self.cap = None
 
-        # Initialize YOLOv8 detector
+        # Initialize YOLO detector
         try:
-            self.detector = YOLOv8Detector(
+            self.detector = YOLODetector(
                 model_name=model_name,
                 confidence_threshold=config.CONFIDENCE_THRESHOLD,
                 device=config.YOLO_DEVICE,
@@ -298,7 +298,7 @@ class CameraApp:
                 verbose=config.YOLO_VERBOSE,
             )
         except Exception as e:
-            print(f"❌ Failed to initialize YOLOv8 detector: {e}")
+            print(f"❌ Failed to initialize YOLO detector: {e}")
             print("Please install ultralytics: pip install ultralytics")
             raise
 
@@ -516,7 +516,7 @@ class CameraApp:
             print(f"⚠️ Warning: Failed to show find object menu: {e}")
 
     def run(self):
-        """Run the main camera loop with YOLOv8 object detection."""
+        """Run the main camera loop with YOLOv11 object detection."""
         if not self.initialize_camera():
             return
 
@@ -526,7 +526,7 @@ class CameraApp:
             actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             self.tracker.set_frame_dimensions(actual_width, actual_height)
 
-        print("\n🎥 Starting YOLOv8 object detection...")
+        print("\n🎥 Starting YOLOv11 object detection...")
         print("Controls:")
         print("  'q' or 'ESC' - Quit")
         print("  'space' - Take screenshot")
@@ -551,7 +551,7 @@ class CameraApp:
                 # Flip frame horizontally for mirror effect
                 frame = cv2.flip(frame, 1)
 
-                # Detect objects using YOLOv8
+                # Detect objects using YOLOv11
                 start_time = time.time()
                 boxes, confidences, class_ids, class_names = (
                     self.detector.detect_objects(frame)
@@ -666,7 +666,7 @@ class CameraApp:
 def main():
     """Main function to parse arguments and run the application."""
     parser = argparse.ArgumentParser(
-        description="Real-time Camera Object Detection with YOLOv8"
+        description="Real-time Camera Object Detection with YOLOv11"
     )
     parser.add_argument(
         "--camera",
@@ -678,7 +678,7 @@ def main():
         "--model",
         type=str,
         default=config.YOLO_MODEL,
-        help=f"YOLOv8 model to use (default: {config.YOLO_MODEL})",
+        help=f"YOLO model to use (default: {config.YOLO_MODEL})",
     )
     parser.add_argument(
         "--confidence",
@@ -717,7 +717,7 @@ def main():
     config.YOLO_HALF = args.half
     config.YOLO_VERBOSE = args.verbose
 
-    print(f"🎥 YOLOv8 Object Detection")
+    print(f"🎥 YOLOv11 Object Detection")
     print(f"Model: {args.model}")
     print(f"Device: {args.device}")
     print(f"Confidence: {args.confidence}")

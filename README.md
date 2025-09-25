@@ -1,15 +1,15 @@
-# Camera Object Detection with YOLOv8 + Object Tracking
+# Camera Object Detection with YOLOv11 + Object Tracking
 
-A real-time object detection application using Python, OpenCV, and YOLOv8 from Ultralytics that captures video from your computer's camera and detects objects in the live feed. Now includes intelligent object tracking that remembers important objects and their locations!
+A real-time object detection application using Python, OpenCV, and YOLOv11 from Ultralytics that captures video from your computer's camera and detects objects in the live feed. Now includes intelligent object tracking that remembers important objects and their locations!
 
-![Object Detection Demo](https://img.shields.io/badge/Python-3.8%2B-blue) ![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-green) ![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-orange) ![License](https://img.shields.io/badge/License-MIT-yellow)
+![Object Detection Demo](https://img.shields.io/badge/Python-3.8%2B-blue) ![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-green) ![YOLOv11](https://img.shields.io/badge/YOLOv11-Ultralytics-orange) ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features
 
 ### Core Detection Features
-- **YOLOv8 Integration**: State-of-the-art object detection with Ultralytics YOLOv8
+- **YOLOv11 Integration**: State-of-the-art object detection with Ultralytics YOLOv11
 - **Real-time Detection**: Live object detection from camera feed with high accuracy
-- **Multiple Model Sizes**: Support for YOLOv8n, YOLOv8s, YOLOv8m, YOLOv8l, YOLOv8x
+- **Multiple Model Sizes**: Support for YOLOv11n, YOLOv11s, YOLOv11m, YOLOv11l, YOLOv11x
 - **GPU Acceleration**: CUDA and MPS support for faster inference
 - **80+ Object Classes**: Supports full COCO dataset object classes
 - **Visual Feedback**: Bounding boxes, confidence scores, and detection counts
@@ -46,6 +46,8 @@ A real-time object detection application using Python, OpenCV, and YOLOv8 from U
    ```bash
    pip install -r requirements.txt
    ```
+
+   The first run will download Ultralytics YOLOv11 weights automatically; if you're offline, download `yolo11n.pt` manually and point `config.YOLO_MODEL` to its path.
 
 3. **Run the application**
    ```bash
@@ -112,7 +114,7 @@ python main.py --help
 
 Available options:
 - `--camera INDEX`: Choose camera index (default: 0)
-- `--model MODEL`: YOLOv8 model to use (default: yolov8n.pt)
+- `--model MODEL`: YOLOv11 model to use (default: yolo11n.pt)
 - `--confidence FLOAT`: Set confidence threshold (default: 0.5)
 - `--device DEVICE`: Device to run inference on (default: cpu)
 - `--imgsz SIZE`: Input image size (default: 640)
@@ -124,8 +126,8 @@ Examples:
 # Use external USB camera
 python main.py --camera 1
 
-# Use larger YOLOv8 model for better accuracy
-python main.py --model yolov8s.pt
+# Use larger YOLOv11 model for better accuracy
+python main.py --model yolo11s.pt
 
 # Lower confidence threshold for more detections
 python main.py --confidence 0.3
@@ -134,7 +136,7 @@ python main.py --confidence 0.3
 python main.py --device cuda
 
 # Combine multiple options
-python main.py --camera 1 --model yolov8m.pt --confidence 0.6 --device cuda
+python main.py --camera 1 --model yolo11m.pt --confidence 0.6 --device cuda
 ```
 
 ## Keyboard Controls
@@ -166,7 +168,7 @@ The application now includes intelligent object tracking. When enabled, you'll s
 
 ```
 Object Detect/
-├── main.py                      # Main application file with YOLOv8 detection
+├── main.py                      # Main application file with YOLOv11 detection
 ├── object_tracker.py           # 🆕 Intelligent object tracking system
 ├── tracking_demo.py            # 🆕 Demo script for tracking features
 ├── config.py                   # Configuration settings (now with tracking config)

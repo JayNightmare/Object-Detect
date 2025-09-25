@@ -16,11 +16,11 @@ CONFIDENCE_THRESHOLD = 0.7
 NMS_THRESHOLD = 0.6
 
 # Model settings
-MODEL_TYPE = "yolov8"  # Options: "opencv_dnn", "yolov3", "yolov5", "yolov8", "tensorflow", "pytorch"
+MODEL_TYPE = "yolov11"  # Options: "opencv_dnn", "yolov3", "yolov5", "yolov11", "tensorflow", "pytorch"
 
-# YOLOv8 Ultralytics settings
+# YOLOv11 Ultralytics settings
 YOLO_MODEL = (
-    "yolov8n.pt"  # Options: yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt
+    "yolo11n.pt"  # Options: yolo11n.pt, yolo11s.pt, yolo11m.pt, yolo11l.pt, yolo11x.pt
 )
 YOLO_DEVICE = "cpu"  # Options: "cpu", "cuda", "mps" (for Mac M1/M2)
 YOLO_IMGSZ = 1280  # Input image size for YOLO model
