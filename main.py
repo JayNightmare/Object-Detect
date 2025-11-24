@@ -15,6 +15,15 @@ import logging
 from typing import List, Tuple, Optional
 from pathlib import Path
 
+# Import Scene Interpreter
+try:
+    from scene_interpreter import SceneInterpreter
+
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+    print("Warning: scene_interpreter module not available. AI features disabled.")
+
 # Import object tracker
 try:
     from object_tracker import ObjectTracker, ObjectTrackerError
@@ -91,6 +100,13 @@ except ImportError:
         SHOW_LAST_SEEN_INFO = True
         TRACKING_HISTORY_FILE = "object_tracking_history.json"
         TRACKING_ENABLE_LOGGING = True
+
+        # Recording settings
+        ENABLE_RECORDING = False
+        OUTPUT_VIDEO_PATH = "output/"
+        VIDEO_CODEC = "mp4v"
+        VIDEO_FPS = 30.0
+        VIDEO_FILENAME_PREFIX = "detection_output"
 
 
 class YOLODetector:
@@ -276,16 +292,21 @@ class YOLODetector:
 class CameraApp:
     """Main camera application for real-time object detection with YOLOv11."""
 
-    def __init__(self, camera_index: int = 0, model_name: str = "yolo11n.pt"):
+    def __init__(self, source: str = "0", model_name: str = "yolo11n.pt"):
         """
         Initialize the camera application.
 
         Args:
-            camera_index: Index of the camera to use (0 for default)
+            source: Camera index (as string "0", "1") or video file path
             model_name: YOLO model to use
         """
-        self.camera_index = camera_index
+        self.source = source
+        # Try to convert to int if it's a digit (for camera index)
+        if str(source).isdigit():
+            self.source = int(source)
+
         self.cap = None
+        self.video_writer = None
 
         # Initialize YOLO detector
         try:
@@ -329,6 +350,24 @@ class CameraApp:
                 print("Continuing without tracking features...")
                 self.tracker = None
 
+        # Initialize AI Scene Interpreter
+        self.scene_interpreter = None
+        self.chat_mode = False
+        self.user_input = ""
+        self.last_thought_time = 0
+
+        if AI_AVAILABLE and hasattr(config, "AI_ENABLED") and config.AI_ENABLED:
+            try:
+                self.scene_interpreter = SceneInterpreter(
+                    api_key=config.OPENROUTER_API_KEY,
+                    model=config.OPENROUTER_MODEL,
+                    system_prompt=getattr(config, "AI_SYSTEM_PROMPT", None),
+                )
+                print("✅ AI Scene Interpreter initialized successfully")
+            except Exception as e:
+                print(f"⚠️ Warning: AI initialization failed: {e}")
+                self.scene_interpreter = None
+
         # FPS calculation
         self.fps_counter = 0
         self.fps_start_time = time.time()
@@ -345,27 +384,59 @@ class CameraApp:
             True if camera initialized successfully, False otherwise
         """
         try:
-            self.cap = cv2.VideoCapture(self.camera_index)
+            self.cap = cv2.VideoCapture(self.source)
 
             if not self.cap.isOpened():
-                print(f"❌ Error: Could not open camera {self.camera_index}")
+                print(f"❌ Error: Could not open source {self.source}")
                 return False
 
-            # Set camera resolution
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+            # Set camera resolution (only works for webcams, ignored for video files)
+            if isinstance(self.source, int):
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
 
             # Get actual resolution
             actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-            print(f"✅ Camera {self.camera_index} initialized successfully")
+            print(f"✅ Source {self.source} initialized successfully")
             print(f"Resolution: {actual_width}x{actual_height}")
+
+            # Initialize video writer if recording is enabled
+            self.initialize_writer(actual_width, actual_height)
+
             return True
 
         except Exception as e:
             print(f"❌ Error initializing camera: {e}")
             return False
+
+    def initialize_writer(self, width: int, height: int):
+        """Initialize video writer for recording."""
+        if hasattr(config, "ENABLE_RECORDING") and config.ENABLE_RECORDING:
+            try:
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                os.makedirs(config.OUTPUT_VIDEO_PATH, exist_ok=True)
+
+                # Handle filename prefix
+                prefix = getattr(config, "VIDEO_FILENAME_PREFIX", "detection_output")
+                filename = (
+                    f"{os.path.join(config.OUTPUT_VIDEO_PATH, prefix)}_{timestamp}.mp4"
+                )
+
+                # Get codec
+                codec_str = getattr(config, "VIDEO_CODEC", "mp4v")
+                fourcc = cv2.VideoWriter_fourcc(*codec_str)
+
+                fps = getattr(config, "VIDEO_FPS", 30.0)
+
+                self.video_writer = cv2.VideoWriter(
+                    filename, fourcc, fps, (width, height)
+                )
+                print(f"🎥 Recording enabled: {filename}")
+            except Exception as e:
+                print(f"❌ Error initializing video writer: {e}")
+                self.video_writer = None
 
     def calculate_fps(self) -> float:
         """Calculate and return current FPS."""
@@ -448,6 +519,69 @@ class CameraApp:
         except Exception as e:
             print(f"⚠️ Warning: Failed to draw tracking info: {e}")
             return frame
+
+    def draw_ai_overlay(self, frame: np.ndarray) -> np.ndarray:
+        """
+        Draw AI response and chat interface.
+        """
+        if not self.scene_interpreter:
+            return frame
+
+        h, w = frame.shape[:2]
+
+        # Draw latest response
+        response = self.scene_interpreter.get_latest_response()
+        if response:
+            # Split response into lines to fit screen
+            max_width = 80  # characters
+            lines = []
+            for line in response.split("\n"):
+                while len(line) > max_width:
+                    lines.append(line[:max_width])
+                    line = line[max_width:]
+                lines.append(line)
+
+            # Draw background for response
+            text_height = len(lines) * 25
+            cv2.rectangle(frame, (0, 0), (w, text_height + 10), (0, 0, 0), -1)
+
+            for i, line in enumerate(lines):
+                cv2.putText(
+                    frame,
+                    line,
+                    (10, 25 * (i + 1)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (255, 255, 255),
+                    1,
+                )
+
+        # Draw chat input if in chat mode
+        if self.chat_mode:
+            # Input box at bottom
+            cv2.rectangle(frame, (0, h - 60), (w, h), (50, 50, 50), -1)
+            cv2.putText(
+                frame,
+                f"User: {self.user_input}_",
+                (10, h - 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2,
+            )
+
+            # Instructions
+            cv2.putText(
+                frame,
+                "Type your message. ENTER to send, ESC to cancel.",
+                (10, h - 45),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.4,
+                (200, 200, 200),
+                1,
+            )
+
+        return frame
 
     def handle_tracking_commands(self, key: int) -> None:
         """
@@ -564,8 +698,22 @@ class CameraApp:
                         tracked_objects = self.tracker.update_tracking(
                             boxes, confidences, class_ids, class_names
                         )
+
+                        # AI Scene Interpretation
+                        if self.scene_interpreter:
+                            current_time = time.time()
+
+                            # Passive mode: periodic "thinking"
+                            if not self.chat_mode:
+                                interval = getattr(config, "AI_THOUGHT_INTERVAL", 10.0)
+                                if current_time - self.last_thought_time > interval:
+                                    self.scene_interpreter.interpret_scene(
+                                        tracked_objects, mode="passive"
+                                    )
+                                    self.last_thought_time = current_time
+
                     except Exception as e:
-                        print(f"⚠️ Warning: Tracking update failed: {e}")
+                        print(f"⚠️ Warning: Tracking/AI update failed: {e}")
 
                 # Draw detections
                 frame = self.detector.draw_detections(
@@ -579,6 +727,10 @@ class CameraApp:
                     and config.SHOW_LAST_SEEN_INFO
                 ):
                     frame = self.draw_tracking_info(frame)
+
+                # Draw AI Overlay
+                if self.scene_interpreter:
+                    frame = self.draw_ai_overlay(frame)
 
                 # Calculate and display FPS
                 fps = self.calculate_fps()
@@ -613,6 +765,8 @@ class CameraApp:
                 # Add instructions
                 if self.tracker:
                     instructions = "Controls: 'q'=quit | 'space'=screenshot | 'r'=reset FPS | 't'=tracking | 'i'=stats"
+                    if self.scene_interpreter:
+                        instructions += " | 'c'=chat"
                 else:
                     instructions = (
                         "Controls: 'q'=quit | 'space'=screenshot | 'r'=reset FPS"
@@ -630,19 +784,50 @@ class CameraApp:
                 # Display frame
                 cv2.imshow("Object Detection w/ Yolo", frame)
 
+                # Write frame to video
+                if self.video_writer:
+                    self.video_writer.write(frame)
+
                 # Handle key presses
                 key = cv2.waitKey(1) & 0xFF
-                if key == ord("q") or key == 27:  # 'q' or ESC
-                    break
-                elif key == ord(" "):  # Space for screenshot
-                    self.save_screenshot(frame)
-                elif key == ord("r"):  # Reset FPS counter
-                    self.fps_counter = 0
-                    self.fps_start_time = time.time()
-                    self.current_fps = 0
-                    print("🔄 FPS counter reset")
-                elif self.tracker:
-                    self.handle_tracking_commands(key)
+
+                # Chat mode input handling
+                if self.chat_mode:
+                    if key == 27:  # ESC to exit chat mode
+                        self.chat_mode = False
+                        self.user_input = ""
+                    elif key == 13:  # ENTER to send
+                        if self.user_input.strip():
+                            # Get current tracking data for context
+                            active_objects = (
+                                self.tracker.get_active_objects()
+                                if self.tracker
+                                else {}
+                            )
+                            self.scene_interpreter.interpret_scene(
+                                active_objects, user_prompt=self.user_input, mode="chat"
+                            )
+                            self.user_input = ""
+                    elif key == 8:  # Backspace
+                        self.user_input = self.user_input[:-1]
+                    elif 32 <= key <= 126:  # Printable characters
+                        self.user_input += chr(key)
+                else:
+                    # Normal controls
+                    if key == ord("q") or key == 27:  # 'q' or ESC
+                        break
+                    elif key == ord(" "):  # Space for screenshot
+                        self.save_screenshot(frame)
+                    elif key == ord("r"):  # Reset FPS counter
+                        self.fps_counter = 0
+                        self.fps_start_time = time.time()
+                        self.current_fps = 0
+                        print("🔄 FPS counter reset")
+                    elif key == ord("c") and self.scene_interpreter:  # Toggle chat mode
+                        self.chat_mode = True
+                        self.user_input = ""
+                    elif self.tracker:
+                        self.handle_tracking_commands(key)
 
         except KeyboardInterrupt:
             print("\n⚠️ Interrupted by user")
@@ -659,6 +844,8 @@ class CameraApp:
             # Clean up
             if self.cap:
                 self.cap.release()
+            if self.video_writer:
+                self.video_writer.release()
             cv2.destroyAllWindows()
             print("✅ Camera released and windows closed")
 
@@ -669,10 +856,10 @@ def main():
         description="Real-time Camera Object Detection with YOLOv11"
     )
     parser.add_argument(
-        "--camera",
-        type=int,
-        default=config.CAMERA_INDEX,
-        help=f"Camera index to use (default: {config.CAMERA_INDEX})",
+        "--source",
+        type=str,
+        default=str(config.CAMERA_INDEX),
+        help=f"Camera index (e.g., '0') or video file path (default: {config.CAMERA_INDEX})",
     )
     parser.add_argument(
         "--model",
@@ -710,20 +897,27 @@ def main():
     args = parser.parse_args()
 
     # Override config with command line arguments
-    config.CAMERA_INDEX = args.camera
+    # config.CAMERA_INDEX is kept for backward compatibility but source is used
+    if args.source.isdigit():
+        config.CAMERA_INDEX = int(args.source)
+
     config.CONFIDENCE_THRESHOLD = args.confidence
     config.YOLO_DEVICE = args.device
     config.YOLO_IMGSZ = args.imgsz
     config.YOLO_HALF = args.half
     config.YOLO_VERBOSE = args.verbose
 
-    print(f"🎥 YOLOv11 Object Detection")
-    print(f"Model: {args.model}")
-    print(f"Device: {args.device}")
-    print(f"Confidence: {args.confidence}")
-    print(f"Image size: {args.imgsz}")
+    # Print final configuration
+    print("\n📸 Final Configuration:")
+    print(f"  Camera Source: {config.CAMERA_INDEX}")
+    print(f"  Model: {config.YOLO_MODEL}")
+    print(f"  Confidence Threshold: {config.CONFIDENCE_THRESHOLD}")
+    print(f"  Device: {config.YOLO_DEVICE}")
+    print(f"  Image Size: {config.YOLO_IMGSZ}")
+    print(f"  Half Precision: {'Enabled' if config.YOLO_HALF else 'Disabled'}")
+    print(f"  Verbose Mode: {'Enabled' if config.YOLO_VERBOSE else 'Disabled'}")
 
-    # Check if YOLO is available
+    # Check YOLO availability
     if not YOLO_AVAILABLE:
         print("\n❌ Ultralytics YOLO is not installed!")
         print("Install it with: pip install ultralytics")
@@ -731,13 +925,13 @@ def main():
 
     # Create and run the camera application
     try:
-        app = CameraApp(camera_index=args.camera, model_name=args.model)
+        app = CameraApp(source=args.source, model_name=args.model)
         app.run()
     except Exception as e:
         print(f"❌ Error running application: {e}")
         print("\nTroubleshooting:")
         print("1. Make sure your camera is not being used by another application")
-        print("2. Try a different camera index: python main.py --camera 1")
+        print("2. Try a different camera index/file: python main.py --source 1")
         print("3. Check if ultralytics is installed: pip install ultralytics")
 
 

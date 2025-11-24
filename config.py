@@ -6,6 +6,11 @@ You can modify these settings to customize the behavior of the detector.
 Following Azure best practices for configuration management.
 """
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+
 # Camera settings
 CAMERA_INDEX = 0
 CAMERA_WIDTH = 1280
@@ -50,10 +55,11 @@ FONT_SCALE = 0.5
 FONT_THICKNESS = 1
 
 # Recording settings
-ENABLE_RECORDING = False
-OUTPUT_VIDEO_PATH = "output/detection_output.avi"
-VIDEO_CODEC = "XVID"
-VIDEO_FPS = 20.0
+ENABLE_RECORDING = True
+OUTPUT_VIDEO_PATH = "output/"
+VIDEO_CODEC = "mp4v"
+VIDEO_FPS = 30.0
+VIDEO_FILENAME_PREFIX = "detection_output"
 
 # Screenshot settings
 SCREENSHOT_PATH = "screenshots/"
@@ -64,9 +70,7 @@ SKIP_FRAMES = 0  # Skip every N frames for better performance (0 = process all f
 RESIZE_FACTOR = 1.0  # Resize input frames (1.0 = no resize, 0.5 = half size)
 
 # Advanced detection settings
-ENABLE_TRACKING = False  # Enable object tracking between frames
-MAX_TRACKING_DISTANCE = 50  # Maximum distance for object tracking
-MIN_DETECTION_SIZE = 30  # Minimum size of detections to display
+# Note: Tracking settings are now handled in the "Object tracking configuration" section below
 
 # Object tracking configuration (following Azure best practices)
 TRACKING_ENABLED = True
@@ -109,3 +113,17 @@ TRACKING_MAX_OBJECTS = 1000  # maximum number of objects to track simultaneously
 SHOW_LAST_SEEN_INFO = True  # show tracking information on screen
 TRACKING_HISTORY_FILE = "object_tracking_history.json"  # file to save tracking history
 TRACKING_ENABLE_LOGGING = True  # enable structured logging for tracking
+
+# AI Interpretation settings (OpenRouter)
+AI_ENABLED = True
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")  # grab from .env file
+OPENROUTER_MODEL = "x-ai/grok-4.1-fast"  # Model to use
+AI_THOUGHT_INTERVAL = 10.0  # Seconds between passive "thoughts"
+AI_SYSTEM_PROMPT = (
+    "You are an AI assistant analyzing a video feed. "
+    "You will be provided with a list of detected objects, their positions (zones), "
+    "and confidence levels. "
+    "Your goal is to interpret the scene, describe what is happening, "
+    "and answer user questions based on this data. "
+    "Keep your responses concise and relevant to the visual context."
+)
