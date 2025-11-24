@@ -11,10 +11,12 @@ import json
 import time
 import math
 import logging
-from typing import Dict, List, Tuple, Optional, Set
+from typing import Dict, List, Tuple, Optional, Set, Any
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from enum import Enum
+import cv2
+import numpy as np
 
 
 class TrackingZone(Enum):
@@ -51,6 +53,7 @@ class TrackedObject:
     times_detected: int
     zone: str
     object_id: str
+    color_hist: Optional[List[float]] = None  # Visual signature for re-identification
 
     def __post_init__(self):
         """Validate object data after initialization."""
@@ -80,6 +83,7 @@ class ObjectTracker:
     - Configuration-driven behavior
     - Resource cleanup and memory management
     - Thread-safe operations where applicable
+    - Visual re-identification for objects leaving/re-entering frame
     """
 
     def __init__(
@@ -91,6 +95,7 @@ class ObjectTracker:
         history_file: str = "object_tracking_history.json",
         enable_logging: bool = True,
         max_tracked_objects: int = 1000,
+        visual_match_threshold: float = 0.7,  # Threshold for histogram matching
     ):
         """
         Initialize the object tracker with comprehensive configuration.
@@ -103,9 +108,7 @@ class ObjectTracker:
             history_file: File path for persistent storage
             enable_logging: Enable structured logging
             max_tracked_objects: Maximum number of objects to track simultaneously
-
-        Raises:
-            ObjectTrackerError: If initialization parameters are invalid
+            visual_match_threshold: Minimum similarity for visual re-identification
         """
         try:
             # Validate input parameters
@@ -124,6 +127,7 @@ class ObjectTracker:
             self.distance_threshold = distance_threshold
             self.max_tracked_objects = max_tracked_objects
             self.history_file = Path(history_file)
+            self.visual_match_threshold = visual_match_threshold
 
             # Tracking state
             self.tracked_objects: Dict[str, TrackedObject] = {}
@@ -263,19 +267,96 @@ class ObjectTracker:
         """
         return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
+    def extract_color_histogram(
+        self, frame: np.ndarray, x: int, y: int, w: int, h: int
+    ) -> Optional[List[float]]:
+        """
+        Extract HSV color histogram from the object's bounding box.
+
+        Args:
+            frame: The full video frame
+            x, y, w, h: Bounding box coordinates
+
+        Returns:
+            Normalized histogram as a list of floats, or None if extraction fails
+        """
+        try:
+            # Ensure coordinates are within frame bounds
+            height, width = frame.shape[:2]
+            x = max(0, x)
+            y = max(0, y)
+            w = min(w, width - x)
+            h = min(h, height - y)
+
+            if w <= 0 or h <= 0:
+                return None
+
+            # Extract ROI
+            roi = frame[y : y + h, x : x + w]
+
+            # Convert to HSV
+            hsv_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+
+            # Calculate histogram (Hue and Saturation)
+            # We ignore Value (brightness) to be more robust to lighting changes
+            # 8 bins for Hue, 8 bins for Saturation
+            hist = cv2.calcHist([hsv_roi], [0, 1], None, [8, 8], [0, 180, 0, 256])
+
+            # Normalize histogram
+            cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
+
+            return hist.flatten().tolist()
+
+        except Exception as e:
+            self.logger.warning(f"Failed to extract color histogram: {e}")
+            return None
+
+    def calculate_histogram_similarity(
+        self, hist1: List[float], hist2: List[float]
+    ) -> float:
+        """
+        Calculate similarity between two histograms using correlation.
+
+        Args:
+            hist1: First histogram
+            hist2: Second histogram
+
+        Returns:
+            Similarity score (0.0 to 1.0)
+        """
+        try:
+            if not hist1 or not hist2:
+                return 0.0
+
+            # Convert back to numpy arrays for cv2.compareHist
+            h1 = np.array(hist1, dtype=np.float32)
+            h2 = np.array(hist2, dtype=np.float32)
+
+            # Use Correlation method
+            return cv2.compareHist(h1, h2, cv2.HISTCMP_CORREL)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to compare histograms: {e}")
+            return 0.0
+
     def find_matching_object(
-        self, class_name: str, center_x: int, center_y: int
+        self,
+        class_name: str,
+        center_x: int,
+        center_y: int,
+        color_hist: Optional[List[float]] = None,
     ) -> Optional[str]:
         """
         Find existing tracked object that matches the current detection.
 
-        Uses spatial proximity and temporal constraints to match objects
-        across frames, implementing a simple but effective tracking algorithm.
+        Uses spatial proximity for active objects and visual similarity
+        for re-identifying lost objects.
 
         Args:
             class_name: Object class name
             center_x: X coordinate of object center
             center_y: Y coordinate of object center
+            color_hist: Optional color histogram for visual matching
 
         Returns:
             Object ID if match found, None otherwise
@@ -283,8 +364,10 @@ class ObjectTracker:
         current_time = time.time()
         best_match = None
         min_distance = float("inf")
+        best_visual_score = -1.0
 
         try:
+            # First pass: Check for spatial match (active objects)
             for obj_id, tracked_obj in self.tracked_objects.items():
                 # Only match same class objects
                 if tracked_obj.class_name != class_name:
@@ -299,10 +382,46 @@ class ObjectTracker:
                     center_x, center_y, tracked_obj.center_x, tracked_obj.center_y
                 )
 
-                # Find closest matching object within threshold
-                if distance < self.distance_threshold and distance < min_distance:
-                    min_distance = distance
-                    best_match = obj_id
+                # Strict distance check for recent objects (e.g., seen in last 2 seconds)
+                is_recent = (current_time - tracked_obj.last_seen) < 2.0
+
+                if is_recent:
+                    if distance < self.distance_threshold and distance < min_distance:
+                        min_distance = distance
+                        best_match = obj_id
+
+            # If spatial match found, return it
+            if best_match:
+                return best_match
+
+            # Second pass: Visual Re-identification (if histogram available)
+            # Only if no spatial match was found
+            if color_hist is not None:
+                for obj_id, tracked_obj in self.tracked_objects.items():
+                    if tracked_obj.class_name != class_name:
+                        continue
+
+                    # Skip if object is too old
+                    if current_time - tracked_obj.last_seen > self.memory_duration:
+                        continue
+
+                    # Skip if object was seen very recently (should have been caught by spatial match)
+                    # This prevents jumping between close objects
+                    if (current_time - tracked_obj.last_seen) < 1.0:
+                        continue
+
+                    # Check visual similarity
+                    if tracked_obj.color_hist:
+                        similarity = self.calculate_histogram_similarity(
+                            color_hist, tracked_obj.color_hist
+                        )
+
+                        if (
+                            similarity > self.visual_match_threshold
+                            and similarity > best_visual_score
+                        ):
+                            best_visual_score = similarity
+                            best_match = obj_id
 
             return best_match
 
@@ -316,6 +435,7 @@ class ObjectTracker:
         confidences: List[float],
         class_ids: List[int],
         class_names: List[str],
+        frame: Optional[np.ndarray] = None,
     ) -> Dict[str, TrackedObject]:
         """
         Update tracking information with new detections.
@@ -328,6 +448,7 @@ class ObjectTracker:
             confidences: Detection confidences
             class_ids: Detected class IDs
             class_names: Detected class names
+            frame: Optional current video frame for visual feature extraction
 
         Returns:
             Dictionary of currently tracked important objects
@@ -363,9 +484,14 @@ class ObjectTracker:
                     center_y = y + h // 2
                     zone = self.get_zone(center_x, center_y)
 
+                    # Extract visual features if frame is available
+                    color_hist = None
+                    if frame is not None:
+                        color_hist = self.extract_color_histogram(frame, x, y, w, h)
+
                     # Try to find matching existing object
                     matching_id = self.find_matching_object(
-                        class_name, center_x, center_y
+                        class_name, center_x, center_y, color_hist
                     )
 
                     if matching_id:
@@ -379,6 +505,18 @@ class ObjectTracker:
                         tracked_obj.last_seen = current_time
                         tracked_obj.times_detected += 1
                         tracked_obj.zone = zone.value
+
+                        # Update histogram (running average to adapt to lighting)
+                        if color_hist is not None:
+                            if tracked_obj.color_hist is None:
+                                tracked_obj.color_hist = color_hist
+                            else:
+                                # Blend 80% old, 20% new
+                                old_hist = np.array(tracked_obj.color_hist)
+                                new_hist = np.array(color_hist)
+                                blended = (0.8 * old_hist + 0.2 * new_hist).tolist()
+                                tracked_obj.color_hist = blended
+
                         updates_made += 1
                     else:
                         # Create new tracked object (with memory limit check)
@@ -400,6 +538,7 @@ class ObjectTracker:
                             times_detected=1,
                             zone=zone.value,
                             object_id=obj_id,
+                            color_hist=color_hist,
                         )
                         updates_made += 1
 
@@ -629,7 +768,7 @@ class ObjectTracker:
             self.logger.warning(f"Failed to format timestamp {timestamp}: {e}")
             return "unknown"
 
-    def get_tracking_statistics(self) -> Dict[str, any]:
+    def get_tracking_statistics(self) -> Dict[str, Any]:
         """
         Get comprehensive tracking statistics for monitoring.
 

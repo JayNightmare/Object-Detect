@@ -533,25 +533,29 @@ class CameraApp:
         response = self.scene_interpreter.get_latest_response()
         if response:
             # Split response into lines to fit screen
-            max_width = 80  # characters
+            max_width = 40  # characters (reduced for right side)
             lines = []
             for line in response.split("\n"):
                 while len(line) > max_width:
                     lines.append(line[:max_width])
                     line = line[max_width:]
-                lines.append(line)
+            lines.append(line)
 
-            # Draw background for response
+            # Calculate dimensions for right-side overlay
             text_height = len(lines) * 25
-            cv2.rectangle(frame, (0, 0), (w, text_height + 10), (0, 0, 0), -1)
+            overlay_width = 400  # Fixed width for right side overlay
+            x_start = w - overlay_width
+
+            # Draw background for response on the right side
+            cv2.rectangle(frame, (x_start, 75), (w, text_height + 90), (0, 0, 0), -1)
 
             for i, line in enumerate(lines):
                 cv2.putText(
                     frame,
                     line,
-                    (10, 25 * (i + 1)),
+                    (x_start + 10, 100 + 25 * i),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
+                    0.5,
                     (255, 255, 255),
                     1,
                 )
@@ -696,7 +700,7 @@ class CameraApp:
                 if self.tracker:
                     try:
                         tracked_objects = self.tracker.update_tracking(
-                            boxes, confidences, class_ids, class_names
+                            boxes, confidences, class_ids, class_names, frame=frame
                         )
 
                         # AI Scene Interpretation
